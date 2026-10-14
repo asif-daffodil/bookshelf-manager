@@ -1,71 +1,78 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
-import { getBooks, createBook, markBookAsRead, deleteBook } from './api/books';
+
+const API_BASE = 'https://bookshelf-manager-pel5.vercel.app';
 
 export default function App() {
   const [books, setBooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load books on mount
-  const fetchBooks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await getBooks();
-      setBooks(data);
-      setIsLoading(false);
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch books.');
-      setIsLoading(false);
-    }
+  useEffect(() => {
+    fetch(`${API_BASE}/books`)
+      .then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to fetch books.');
+        }
+        return response.json();
+      })
+      .then(setBooks)
+      .catch((err) => setError(err.message || 'Failed to fetch books.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
-
-  // Handler: Add a new book
   const handleAddBook = async (title, author) => {
     try {
-      const newBook = await createBook({ title, author });
-      setBooks((currentBooks) => [newBook, ...currentBooks]);
+      const response = await fetch(`${API_BASE}/books`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to add book.');
+      }
+      const newBook = await response.json();
+      setBooks((books) => [newBook, ...books]);
       setError(null);
       return true;
     } catch (err) {
-      setError(err.message || 'Failed to add book.');
+      setError(err.message);
       return false;
     }
   };
 
-  // Handler: Mark book as read
   const handleMarkAsRead = async (id) => {
     try {
-      const updatedBook = await markBookAsRead(id);
-      setBooks((currentBooks) =>
-        currentBooks.map((book) => (book.id === updatedBook.id ? updatedBook : book))
+      const response = await fetch(`${API_BASE}/books/${id}`, { method: 'PUT' });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update book status.');
+      }
+      const updatedBook = await response.json();
+      setBooks((books) =>
+        books.map((book) => (book.id === updatedBook.id ? updatedBook : book))
       );
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to update book status.');
+      setError(err.message);
     }
   };
 
-  // Handler: Delete book
   const handleDeleteBook = async (id) => {
     try {
-      await deleteBook(id);
-      setBooks((currentBooks) => currentBooks.filter((book) => book.id !== id));
+      const response = await fetch(`${API_BASE}/books/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete book.');
+      }
+      setBooks((books) => books.filter((book) => book.id !== id));
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to delete book.');
+      setError(err.message);
     }
-  };
-
-  // Handler: Dismiss error banner
-  const handleDismissError = () => {
-    setError(null);
   };
 
   return (
@@ -126,7 +133,7 @@ export default function App() {
             </div>
             <button
               type="button"
-              onClick={handleDismissError}
+              onClick={() => setError(null)}
               className="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-100/70 transition-colors cursor-pointer"
               aria-label="Dismiss error banner"
             >
