@@ -1,78 +1,24 @@
-import React, { useEffect, useReducer, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
 import { getBooks, createBook, markBookAsRead, deleteBook } from './api/books';
 
-// Initial state
-const initialState = {
-  books: [],
-  isLoading: true,
-  error: null,
-};
-
-// Reducer function managing all bookshelf state
-function booksReducer(state, action) {
-  switch (action.type) {
-    case 'SET_LOADING':
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    case 'SET_BOOKS':
-      return {
-        ...state,
-        books: action.payload,
-        isLoading: false,
-        error: null,
-      };
-    case 'ADD_BOOK':
-      // Prepend the new book to keep newest first
-      return {
-        ...state,
-        books: [action.payload, ...state.books],
-        error: null,
-      };
-    case 'MARK_READ':
-      return {
-        ...state,
-        books: state.books.map((book) =>
-          book.id === action.payload.id ? action.payload : book
-        ),
-        error: null,
-      };
-    case 'DELETE_BOOK':
-      return {
-        ...state,
-        books: state.books.filter((book) => book.id !== action.payload),
-        error: null,
-      };
-    case 'SET_ERROR':
-      return {
-        ...state,
-        error: action.payload,
-        isLoading: false,
-      };
-    case 'CLEAR_ERROR':
-      return {
-        ...state,
-        error: null,
-      };
-    default:
-      return state;
-  }
-}
-
 export default function App() {
-  const [state, dispatch] = useReducer(booksReducer, initialState);
+  const [books, setBooks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Load books on mount
   const fetchBooks = useCallback(async () => {
-    dispatch({ type: 'SET_LOADING', payload: true });
+    setIsLoading(true);
     try {
       const data = await getBooks();
-      dispatch({ type: 'SET_BOOKS', payload: data });
+      setBooks(data);
+      setIsLoading(false);
+      setError(null);
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Failed to fetch books.' });
+      setError(err.message || 'Failed to fetch books.');
+      setIsLoading(false);
     }
   }, []);
 
@@ -84,10 +30,11 @@ export default function App() {
   const handleAddBook = async (title, author) => {
     try {
       const newBook = await createBook({ title, author });
-      dispatch({ type: 'ADD_BOOK', payload: newBook });
+      setBooks((currentBooks) => [newBook, ...currentBooks]);
+      setError(null);
       return true;
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Failed to add book.' });
+      setError(err.message || 'Failed to add book.');
       return false;
     }
   };
@@ -96,9 +43,12 @@ export default function App() {
   const handleMarkAsRead = async (id) => {
     try {
       const updatedBook = await markBookAsRead(id);
-      dispatch({ type: 'MARK_READ', payload: updatedBook });
+      setBooks((currentBooks) =>
+        currentBooks.map((book) => (book.id === updatedBook.id ? updatedBook : book))
+      );
+      setError(null);
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Failed to update book status.' });
+      setError(err.message || 'Failed to update book status.');
     }
   };
 
@@ -106,15 +56,16 @@ export default function App() {
   const handleDeleteBook = async (id) => {
     try {
       await deleteBook(id);
-      dispatch({ type: 'DELETE_BOOK', payload: id });
+      setBooks((currentBooks) => currentBooks.filter((book) => book.id !== id));
+      setError(null);
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Failed to delete book.' });
+      setError(err.message || 'Failed to delete book.');
     }
   };
 
   // Handler: Dismiss error banner
   const handleDismissError = () => {
-    dispatch({ type: 'CLEAR_ERROR' });
+    setError(null);
   };
 
   return (
@@ -151,7 +102,7 @@ export default function App() {
       {/* Main Container */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {/* Dismissible Error Banner */}
-        {state.error && (
+        {error && (
           <div
             role="alert"
             className="mb-8 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start justify-between gap-3 shadow-xs transition-all"
@@ -170,7 +121,7 @@ export default function App() {
               </svg>
               <div>
                 <p className="text-sm font-semibold text-rose-900">Request Failed</p>
-                <p className="text-sm text-rose-700 mt-0.5">{state.error}</p>
+                <p className="text-sm text-rose-700 mt-0.5">{error}</p>
               </div>
             </div>
             <button
@@ -196,8 +147,8 @@ export default function App() {
           {/* Right Column: Book List */}
           <section className="lg:col-span-7">
             <BookList
-              books={state.books}
-              isLoading={state.isLoading}
+              books={books}
+              isLoading={isLoading}
               onMarkAsRead={handleMarkAsRead}
               onDeleteBook={handleDeleteBook}
             />
@@ -207,4 +158,3 @@ export default function App() {
     </div>
   );
 }
-

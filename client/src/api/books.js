@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = "https://bookshelf-manager-pel5.vercel.app";
 
 async function handleResponse(response) {
   let data;
